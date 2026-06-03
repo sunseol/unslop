@@ -1,0 +1,29 @@
+{
+  "name": "@unslop/cli",
+  "version": "0.0.0",
+  "description": "CLI-first design quality gate for AI-generated interfaces.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "unslop": "./dist/bin/unslop.js"
+  },
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test test/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.8.3"
+  }
+}

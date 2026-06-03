@@ -1,0 +1,51 @@
+product:
+  name: "DOTORE TOPIK"
+  type: "education"
+  primary_user: "TOPIK learners"
+  primary_tasks:
+    - solve questions
+    - review wrong answers
+    - get writing feedback
+
+brand:
+  tone:
+    - clear
+    - calm
+    - practical
+  avoid_visuals:
+    - neon glow
+    - purple cyan gradient
+    - generic dashboard cards
+    - glassmorphism
+    - fake 3d mascot
+  avoid_copy:
+    - "사용자 경험을 향상"
+    - "다양한 방식으로 활용"
+    - "혁신적인"
+    - "AI-powered insights"
+
+tokens:
+  spacing: [0, 4, 8, 12, 16, 24, 32, 48, 64]
+  radius:
+    sm: 6
+    md: 10
+    lg: 16
+  typography:
+    sizes: [12, 14, 16, 18, 20, 24, 32, 40]
+
+thresholds:
+  design_signal: 75
+  accessibility: 85
+  system_fit: 80
+  product_specificity: 70
+
+fix:
+  safe_auto_apply:
+    - copy_trim
+    - spacing_snap
+    - contrast_suggestion
+    - token_suggestion
+  require_human_review:
+    - brand_palette_change
+    - layout_restructure
+    - visual_direction_change

@@ -1,0 +1,14 @@
+{
+  "name": "unslop-workspace",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w @unslop/cli",
+    "test": "npm run test -w @unslop/cli",
+    "lint": "npm run lint -w @unslop/cli",
+    "check": "npm run build && npm run test && npm run lint"
+  }
+}
