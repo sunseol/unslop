@@ -1,0 +1,41 @@
+name: Bug report
+description: Report a reproducible defect in unslop.
+title: "[bug] "
+labels:
+  - bug
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What failed, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction
+      description: Include the command, input shape, and minimal files or output.
+      placeholder: |
+        npm run check
+        unslop design check --url http://localhost:3000 --json
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      placeholder: "@unslop/cli 0.0.0, Node 24.x"
+  - type: textarea
+    id: output
+    attributes:
+      label: Output
+      description: Paste the relevant output. Redact secrets and private content.
+      render: text
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety
+      options:
+        - label: I removed secrets, private URLs, proprietary screenshots, and personal data from this issue.
+          required: true

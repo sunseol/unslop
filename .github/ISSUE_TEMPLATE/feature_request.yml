@@ -1,0 +1,38 @@
+name: Feature request
+description: Propose a scoped product or developer workflow improvement.
+title: "[feature] "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user workflow does this improve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What should unslop do?
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - CLI UX
+        - Browser-rendered URL checks
+        - React/Tailwind/static file checks
+        - Rule/scoring behavior
+        - Reports
+        - Agent workflow
+        - Figma or design tools
+        - CI/CD or repository workflow
+  - type: textarea
+    id: non_goals
+    attributes:
+      label: Non-goals
+      description: What should this not do?

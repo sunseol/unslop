@@ -3,4 +3,7 @@ dist/
 coverage/
 .DS_Store
 *.log
+*.tgz
+.env
+.env.*
 unslop-report.html
