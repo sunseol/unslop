@@ -9,6 +9,7 @@
     "build": "npm run build -w @unslop/cli",
     "test": "npm run test -w @unslop/cli",
     "lint": "npm run lint -w @unslop/cli",
-    "check": "npm run build && npm run test && npm run lint"
+    "check": "npm run build && npm run test && npm run lint",
+    "pack:dry-run": "npm pack --workspace @unslop/cli --dry-run"
   }
 }

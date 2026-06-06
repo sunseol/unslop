@@ -4,7 +4,7 @@ Remove AI slop from UI, copy, and visual design.
 
 `unslop` is a CLI-first design quality gate for AI-generated interfaces. It checks code, HTML, and live URLs for generic visual patterns, weak hierarchy, design-system drift, accessibility issues, missing UX states, and low product specificity.
 
-Status: pre-alpha scaffold. The current MVP focuses on deterministic checks for web UI source and fetched HTML. Screenshot, browser-rendered URL, and Figma adapters are planned extension points.
+Status: pre-alpha scaffold. The current scaffold runs deterministic checks for web UI source, fetched HTML, stdin, and basic reports. The v0.1 planning decision is to promote URL checks to Playwright-based browser-rendered analysis while keeping Figma, user screenshot upload, external vision APIs, and automatic writes out of v0.1.
 
 ## Install
 
@@ -54,3 +54,17 @@ AI detection is unreliable. Design quality is inspectable.
 ## Roadmap
 
 See [docs/roadmap.md](docs/roadmap.md).
+
+## Contributing
+
+Repository workflow:
+
+- [docs/repository-governance.md](docs/repository-governance.md)
+- [docs/working-tree-rules.md](docs/working-tree-rules.md)
+- [docs/pr-rules.md](docs/pr-rules.md)
+- [docs/branch-protection.md](docs/branch-protection.md)
+
+Planning source:
+
+- [docs/planner-discovery-questions.md](docs/planner-discovery-questions.md)
+- [docs/planner-discovery-answers-v0.1.md](docs/planner-discovery-answers-v0.1.md)
