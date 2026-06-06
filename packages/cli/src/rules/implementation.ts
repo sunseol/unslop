@@ -12,7 +12,7 @@ export const implementationRule: Rule = {
         createFinding({
           id: "screenshot-adapter-pending",
           title: "Screenshot adapter pending",
-          severity: "high",
+          severity: "blocking",
           axis: "implementation_readiness",
           message: "This scaffold accepts image targets, but screenshot vision analysis is not implemented yet.",
           suggestion: "Use code or --url for v0.1, or add a screenshot adapter that emits normalized AuditInput.",

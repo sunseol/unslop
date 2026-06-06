@@ -1,10 +1,17 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { loadAuditInput } from "./adapters/code.js";
-import { loadConfig } from "./core/config.js";
+import { CONFIG_CANDIDATES, loadConfig } from "./core/config.js";
+import {
+  evaluateQualityGate,
+  SCHEMA_VERSION,
+  type QualityGate
+} from "./core/decision.js";
 import { runAudit } from "./core/rule-engine.js";
 import { formatPlan, formatTextReport, writeHtmlReport } from "./core/report.js";
-import type { AuditResult, CliOptions } from "./core/types.js";
+import type { AuditResult, CliOptions, Finding, FixKind } from "./core/types.js";
 import { defaultRules } from "./rules/index.js";
+
+const DEFAULT_CONFIG_PATH = "unslop.design.yml";
 
 export async function run(argv: string[]): Promise<number> {
   const [scope, command, ...rest] = argv;
@@ -26,6 +33,8 @@ export async function run(argv: string[]): Promise<number> {
   const parsed = parseArgs(rest);
 
   switch (command) {
+    case "init":
+      return runInit(parsed.positionals, parsed.options);
     case "check":
       return runCheck(parsed.positionals, parsed.options);
     case "plan":
@@ -41,17 +50,61 @@ export async function run(argv: string[]): Promise<number> {
   }
 }
 
-async function runCheck(targets: string[], options: CliOptions): Promise<number> {
-  const result = await audit(targets, options);
-  if (options.json) {
-    console.log(JSON.stringify(toJsonResult(result), null, 2));
-  } else {
-    console.log(formatTextReport(result));
+async function runInit(targets: string[], options: CliOptions): Promise<number> {
+  if (targets.length > 0) {
+    throw new Error("design init does not accept file targets.");
   }
 
-  const threshold = options.threshold ?? result.config.thresholds?.design_signal;
-  if ((options.ci || options.threshold !== undefined) && threshold !== undefined) {
-    return result.scores.designSignal >= threshold ? 0 : 1;
+  const existing = CONFIG_CANDIDATES.find((path) => existsSync(path));
+  const overwritesDefaultConfig = existsSync(DEFAULT_CONFIG_PATH);
+  if (existing && !options.force) {
+    throw new Error(
+      `${existing} already exists. Re-run with --force to overwrite ${DEFAULT_CONFIG_PATH}.`
+    );
+  }
+
+  writeFileSync(DEFAULT_CONFIG_PATH, defaultConfigTemplate(), "utf8");
+
+  if (options.json) {
+    console.log(
+      JSON.stringify(
+        {
+          path: DEFAULT_CONFIG_PATH,
+          overwritten: overwritesDefaultConfig,
+          ...(existing && existing !== DEFAULT_CONFIG_PATH ? { existing_config: existing } : {})
+        },
+        null,
+        2
+      )
+    );
+  } else {
+    console.log(`Wrote ${DEFAULT_CONFIG_PATH}`);
+  }
+
+  return 0;
+}
+
+async function runCheck(targets: string[], options: CliOptions): Promise<number> {
+  const result = await audit(targets, options);
+  const gate = gateForOptions(result, options);
+  if (options.json) {
+    const mode = options.agent ? "agent" : "check";
+    console.log(JSON.stringify(toJsonResult(result, gate, mode), null, 2));
+  } else {
+    console.log(formatTextReport(result, gate));
+  }
+
+  if (options.agent && gate.decision !== "pass") {
+    return 1;
+  }
+
+  if (
+    (options.ci ||
+      options.threshold !== undefined ||
+      options.accessibilityThreshold !== undefined) &&
+    gate.failures.length > 0
+  ) {
+    return 1;
   }
   return 0;
 }
@@ -125,28 +178,10 @@ async function runReport(targets: string[], options: CliOptions): Promise<number
 
 async function runAgentCheck(targets: string[], options: CliOptions): Promise<number> {
   const result = await audit(targets, { ...options, stdin: options.stdin || targets.length === 0 });
-  const highCount = result.findings.filter((finding) => finding.severity === "high").length;
-  const status = result.scores.designSignal >= 75 && highCount === 0 ? "pass" : "fail";
-  const payload = {
-    status,
-    decision: status === "pass" ? "show_user" : "revise_before_showing_user",
-    design_signal_score: result.scores.designSignal,
-    ai_slop_risk: result.scores.aiSlopRisk,
-    blocking_issues: highCount,
-    issues: result.findings.map((finding) => ({
-      type: finding.id,
-      severity: finding.severity,
-      axis: finding.axis,
-      reason: finding.message,
-      suggested_fix: finding.suggestion,
-      evidence: finding.evidence,
-      source: finding.source
-    })),
-    recommended_action: status === "pass" ? "pass" : "revise"
-  };
+  const gate = gateForOptions(result, options);
 
-  console.log(JSON.stringify(payload, null, 2));
-  return status === "pass" ? 0 : 1;
+  console.log(JSON.stringify(toJsonResult(result, gate, "agent"), null, 2));
+  return gate.decision === "pass" ? 0 : 1;
 }
 
 async function audit(targets: string[], options: CliOptions): Promise<AuditResult> {
@@ -201,6 +236,18 @@ function parseArgs(args: string[]): { positionals: string[]; options: CliOptions
       options.write = true;
       continue;
     }
+    if (arg === "--force") {
+      options.force = true;
+      continue;
+    }
+    if (arg === "--agent") {
+      options.agent = true;
+      continue;
+    }
+    if (arg === "--fail-on-high") {
+      options.failOnHigh = true;
+      continue;
+    }
     if (arg === "--tailwind") {
       options.tailwind = true;
       continue;
@@ -226,10 +273,14 @@ function parseArgs(args: string[]): { positionals: string[]; options: CliOptions
       continue;
     }
     if (arg === "--threshold") {
-      options.threshold = Number(requireValue(args, (index += 1), arg));
-      if (!Number.isFinite(options.threshold)) {
-        throw new Error("--threshold must be a number.");
-      }
+      options.threshold = parseNumberOption(requireValue(args, (index += 1), arg), arg);
+      continue;
+    }
+    if (arg === "--accessibility-threshold") {
+      options.accessibilityThreshold = parseNumberOption(
+        requireValue(args, (index += 1), arg),
+        arg
+      );
       continue;
     }
 
@@ -250,10 +301,14 @@ function parseArgs(args: string[]): { positionals: string[]; options: CliOptions
       continue;
     }
     if (arg.startsWith("--threshold=")) {
-      options.threshold = Number(arg.slice("--threshold=".length));
-      if (!Number.isFinite(options.threshold)) {
-        throw new Error("--threshold must be a number.");
-      }
+      options.threshold = parseNumberOption(arg.slice("--threshold=".length), "--threshold");
+      continue;
+    }
+    if (arg.startsWith("--accessibility-threshold=")) {
+      options.accessibilityThreshold = parseNumberOption(
+        arg.slice("--accessibility-threshold=".length),
+        "--accessibility-threshold"
+      );
       continue;
     }
     if (arg.startsWith("--output=")) {
@@ -275,13 +330,100 @@ function requireValue(args: string[], index: number, flag: string): string {
   return value;
 }
 
-function toJsonResult(result: AuditResult): unknown {
+function parseNumberOption(value: string, flag: string): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`${flag} must be a number.`);
+  }
+  return parsed;
+}
+
+function gateForOptions(result: AuditResult, options: CliOptions): QualityGate {
+  return evaluateQualityGate(result, {
+    designSignalThreshold: options.threshold,
+    accessibilityThreshold: options.accessibilityThreshold,
+    failOnHigh: options.failOnHigh
+  });
+}
+
+function toJsonResult(
+  result: AuditResult,
+  gate: QualityGate,
+  mode: "check" | "agent"
+): unknown {
   return {
-    target: result.input.target,
-    kind: result.input.kind,
-    scores: result.scores,
-    findings: result.findings
+    schema_version: SCHEMA_VERSION,
+    mode,
+    target: {
+      kind: result.input.kind,
+      value: result.input.target,
+      metadata: result.input.metadata
+    },
+    decision: gate.decision,
+    scores: {
+      design_signal: result.scores.designSignal,
+      ai_slop_risk: result.scores.aiSlopRisk,
+      product_readiness: result.scores.productReadiness,
+      axes: result.scores.axes,
+      thresholds: gate.thresholds
+    },
+    findings: result.findings.map(toJsonFinding),
+    safe_fixes: fixesFor(result.findings, "safe"),
+    suggested_fixes: fixesFor(result.findings, "suggested"),
+    human_review_required: fixesFor(result.findings, "human_review"),
+    next_action: nextAction(gate)
   };
+}
+
+function toJsonFinding(finding: Finding): unknown {
+  return {
+    id: finding.id,
+    rule_id: finding.id,
+    category: finding.axis,
+    severity: finding.severity,
+    confidence: confidenceForSeverity(finding.severity),
+    message: finding.title,
+    reason: finding.message,
+    evidence: finding.evidence,
+    source: finding.source,
+    suggested_fix: finding.suggestion,
+    fix_bucket: finding.fixKind
+  };
+}
+
+function fixesFor(findings: Finding[], fixKind: FixKind): unknown[] {
+  return findings
+    .filter((finding) => finding.fixKind === fixKind)
+    .map((finding) => ({
+      finding_id: finding.id,
+      severity: finding.severity,
+      suggestion: finding.suggestion,
+      evidence: finding.evidence,
+      source: finding.source
+    }));
+}
+
+function nextAction(gate: QualityGate): "pass" | "revise" | "human_review" {
+  if (gate.decision === "pass") {
+    return "pass";
+  }
+  if (gate.decision === "block") {
+    return "human_review";
+  }
+  return "revise";
+}
+
+function confidenceForSeverity(severity: Finding["severity"]): number {
+  if (severity === "blocking") {
+    return 0.95;
+  }
+  if (severity === "high") {
+    return 0.9;
+  }
+  if (severity === "medium") {
+    return 0.82;
+  }
+  return 0.7;
 }
 
 async function readStdin(): Promise<string> {
@@ -303,6 +445,7 @@ Usage:
   unslop design <command> [target] [options]
 
 Commands:
+  design init         Create unslop.design.yml
   design check        Audit a file, directory, URL, or stdin
   design plan         Print a design fix plan
   design fix          Print safe or suggested fix candidates
@@ -315,13 +458,45 @@ function printDesignHelp(): void {
   console.log(`unslop design
 
 Usage:
-  unslop design check <file-or-dir> [--json]
-  unslop design check --url http://localhost:3000 [--threshold 75 --ci]
+  unslop design init [--force]
+  unslop design check <file-or-dir> [--json --agent]
+  unslop design check --url http://localhost:3000 [--threshold 75 --ci --fail-on-high]
   unslop design plan <file-or-dir> [--product "TOPIK learning app"]
   unslop design fix <file-or-dir> [--safe | --suggest]
   unslop design report <file-or-dir> [-o unslop-report.html]
   unslop design agent-check --stdin --json
 `);
+}
+
+function defaultConfigTemplate(): string {
+  return `product:
+  name: "Your product"
+  type: "web app"
+  primary_user: "Your primary user"
+  primary_tasks:
+    - "complete the main workflow"
+
+brand:
+  avoid_visuals:
+    - "neon glow"
+    - "purple cyan gradient"
+  avoid_copy:
+    - "Unlock your potential"
+    - "AI-powered insights"
+
+tokens:
+  spacing: [0, 4, 8, 12, 16, 24, 32, 48, 64]
+  radius:
+    sm: 6
+    md: 10
+    lg: 16
+
+thresholds:
+  design_signal: 75
+  accessibility: 85
+
+ignore: []
+`;
 }
 
 export function readFixture(path: string): string {

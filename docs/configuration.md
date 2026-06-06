@@ -34,4 +34,19 @@ tokens:
 
 thresholds:
   design_signal: 75
+  accessibility: 85
+
+ignore:
+  - rule_id: generic-cta-get-started
+    target: "app/page.tsx"
+    reason: "Temporary launch CTA approved by product."
 ```
+
+Inline suppression is available for a single following source line:
+
+```tsx
+// unslop-ignore-next-line image-missing-alt -- decorative image handled by CSS
+<img src="/hero.png">
+```
+
+`ignore.target` matches the finding source path exactly or as a path suffix. It does not match finding evidence text or arbitrary substrings inside sibling filenames.

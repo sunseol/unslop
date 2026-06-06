@@ -34,6 +34,8 @@ future packages
 
 The current scaffold keeps most code in `@unslop/cli`, but v0.1 development should move shared rule and scoring logic toward `@unslop/core` and keep Playwright behind a browser adapter boundary.
 
+Current implementation note: the CLI package owns the first browser adapter boundary in `src/adapters/browser.ts`. It uses Playwright when that package is available in the local environment and falls back to local `fetch` only when Playwright is unavailable or cannot launch, avoiding any external API calls or required browser dependency in the pre-alpha scaffold. Page render failures are surfaced instead of silently downgrading to `fetch`.
+
 ## v0.1 Inputs
 
 - `--url http://localhost:3000`
@@ -54,7 +56,10 @@ unslop design check --url http://localhost:3000 --json
 unslop design check --url http://localhost:3000 --ci
 ```
 
-`agent-check` remains a future formal command. In v0.1, agent workflows should consume `check --json --agent` or the stable JSON output from `check --json`.
+In v0.1, agent workflows should consume `check --json --agent` or the stable JSON output from `check --json`. The scaffold keeps `agent-check` as a compatibility command that emits the same schema in `agent` mode.
+
+Current JSON output uses `schema_version: "0.1.0"` and emits `decision`, `scores`, normalized findings, safe/suggested/human-review fix buckets, and `next_action`.
+Agent-mode commands exit non-zero when the decision is not `pass`.
 
 ## Finding Schema
 
@@ -103,8 +108,10 @@ v0.1 should expose these score axes:
 - Copy Signal: 20%
 - Product Specificity: 15%
 - Hierarchy: 10%
+- Interaction Readiness: 5%
+- Visual Intent: 5%
 
-Visual Intent and Interaction Readiness may remain internal finding categories in v0.1. Blocking findings can force the decision to `block` regardless of aggregate score.
+Brand Distinctiveness and Implementation Readiness remain exposed as finding axes but do not affect the weighted Design Signal Score in the scaffold. Blocking findings can force the decision to `block` regardless of aggregate score.
 
 Default thresholds:
 
@@ -117,6 +124,8 @@ CI mode fails when:
 - `Design Signal Score < threshold`
 - `Accessibility Score < accessibility threshold`
 - `--fail-on-high` is set and at least one `high` finding exists
+
+The scaffold also treats unsupported image input as a blocking implementation-readiness finding because v0.1 does not analyze user-provided screenshots.
 
 ## Rule Families
 

@@ -1,4 +1,4 @@
-export type Severity = "high" | "medium" | "low";
+export type Severity = "blocking" | "high" | "medium" | "low";
 
 export type ScoreAxis =
   | "visual_intent"
@@ -54,11 +54,18 @@ export interface ThresholdConfig {
   product_specificity?: number;
 }
 
+export interface IgnoreConfig {
+  rule_id: string;
+  target?: string;
+  reason?: string;
+}
+
 export interface AuditConfig {
   product?: ProductConfig;
   brand?: BrandConfig;
   tokens?: TokenConfig;
   thresholds?: ThresholdConfig;
+  ignore?: IgnoreConfig[];
 }
 
 export interface SourceLocation {
@@ -87,7 +94,7 @@ export interface AxisScore {
 export interface AuditScores {
   designSignal: number;
   aiSlopRisk: "Very High" | "High" | "Medium" | "Low";
-  productReadiness: "Low" | "Needs work" | "Good" | "Ready";
+  productReadiness: "Blocked" | "Low" | "Needs work" | "Good" | "Ready";
   axes: AxisScore[];
 }
 
@@ -110,11 +117,15 @@ export interface CliOptions {
   safe?: boolean;
   suggest?: boolean;
   write?: boolean;
+  force?: boolean;
+  agent?: boolean;
+  failOnHigh?: boolean;
   tailwind?: boolean;
   url?: string;
   figma?: string;
   output?: string;
   threshold?: number;
+  accessibilityThreshold?: number;
   config?: string;
   product?: string;
 }

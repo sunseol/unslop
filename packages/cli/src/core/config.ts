@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { AuditConfig } from "./types.js";
 
-const CONFIG_CANDIDATES = [
+export const CONFIG_CANDIDATES = [
   "unslop.design.yml",
   "unslop.design.yaml",
   "unslop.design.json"

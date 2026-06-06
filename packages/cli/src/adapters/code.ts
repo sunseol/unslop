@@ -1,6 +1,7 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import { basename, dirname, extname, relative, resolve, sep } from "node:path";
 import type { AuditInput, SourceFile } from "../core/types.js";
+import { loadUrlAuditInput } from "./browser.js";
 
 const TEXT_EXTENSIONS = new Set([
   ".astro",
@@ -24,21 +25,7 @@ export async function loadAuditInput(input: {
   stdinContent?: string | undefined;
 }): Promise<AuditInput> {
   if (input.url) {
-    const response = await fetch(input.url);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch ${input.url}: ${response.status} ${response.statusText}`);
-    }
-    const content = await response.text();
-    return {
-      kind: "url",
-      target: input.url,
-      content,
-      files: [{ path: input.url, content }],
-      metadata: {
-        status: response.status,
-        contentType: response.headers.get("content-type") ?? ""
-      }
-    };
+    return loadUrlAuditInput(input.url);
   }
 
   if (input.stdinContent !== undefined) {

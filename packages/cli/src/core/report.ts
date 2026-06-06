@@ -1,5 +1,6 @@
 import { writeFileSync } from "node:fs";
 import type { AuditResult, Finding, FixKind, ScoreAxis } from "./types.js";
+import { evaluateQualityGate, type QualityGate } from "./decision.js";
 
 const AXIS_LABEL: Record<ScoreAxis, string> = {
   visual_intent: "Visual Intent",
@@ -19,7 +20,7 @@ const FIX_LABEL: Record<FixKind, string> = {
   human_review: "Human review required"
 };
 
-export function formatTextReport(result: AuditResult): string {
+export function formatTextReport(result: AuditResult, gate = evaluateQualityGate(result)): string {
   const lines = [
     "UNSLOP DESIGN REPORT",
     "",
@@ -28,6 +29,9 @@ export function formatTextReport(result: AuditResult): string {
     "",
     "Design Signal Score:",
     `  ${result.scores.designSignal} / 100`,
+    "",
+    "Decision:",
+    `  ${gate.decision}`,
     "",
     "AI Slop Risk:",
     `  ${result.scores.aiSlopRisk}`,
@@ -47,10 +51,12 @@ export function formatTextReport(result: AuditResult): string {
     return lines.join("\n");
   }
 
-  lines.push("", "Findings:");
-  for (const finding of result.findings) {
+  lines.push("", "Top Findings:");
+  for (const finding of result.findings.slice(0, 5)) {
     lines.push(formatFinding(finding));
   }
+
+  appendNextAction(lines, gate);
 
   return lines.join("\n");
 }
@@ -173,6 +179,20 @@ function appendFixGroup(lines: string[], result: AuditResult, fixKind: FixKind):
   for (const finding of findings) {
     lines.push(`- ${finding.suggestion}`);
   }
+}
+
+function appendNextAction(lines: string[], gate: QualityGate): void {
+  lines.push("", "Next:");
+  if (gate.decision === "pass") {
+    lines.push("  Ready for review or CI use.");
+    return;
+  }
+  if (gate.decision === "block") {
+    lines.push("  Resolve blocking findings before continuing.");
+    return;
+  }
+  lines.push("  Run unslop design check --json for the full machine-readable result.");
+  lines.push("  Run unslop design plan for a grouped fix plan.");
 }
 
 function escapeHtml(value: string): string {

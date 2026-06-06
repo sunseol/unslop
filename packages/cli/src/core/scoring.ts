@@ -18,9 +18,20 @@ export const SCORE_AXES: ScoreAxis[] = [
 ];
 
 const PENALTY: Record<Severity, number> = {
+  blocking: 35,
   high: 18,
   medium: 10,
   low: 5
+};
+
+const SCORE_WEIGHTS: Partial<Record<ScoreAxis, number>> = {
+  accessibility: 25,
+  system_fit: 20,
+  copy_signal: 20,
+  product_specificity: 15,
+  hierarchy: 10,
+  interaction_readiness: 5,
+  visual_intent: 5
 };
 
 export function scoreFindings(findings: Finding[]): AuditScores {
@@ -35,13 +46,18 @@ export function scoreFindings(findings: Finding[]): AuditScores {
   });
 
   const designSignal = Math.round(
-    axes.reduce((sum, axisScore) => sum + axisScore.score, 0) / axes.length
+    axes.reduce(
+      (sum, axisScore) => sum + axisScore.score * ((SCORE_WEIGHTS[axisScore.axis] ?? 0) / 100),
+      0
+    )
   );
 
   return {
     designSignal,
     aiSlopRisk: riskForScore(designSignal),
-    productReadiness: readinessForScore(designSignal),
+    productReadiness: findings.some((finding) => finding.severity === "blocking")
+      ? "Blocked"
+      : readinessForScore(designSignal),
     axes
   };
 }
